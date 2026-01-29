@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zenfily — Prospecção de Clientes para Prestadores de Serviço</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(180deg, #f5f3ff, #ffffff);
+      color: #111827;
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .navbar {
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px 20px;
+      max-width: 1200px;
+      margin: 20px auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+    }
+
+    .nav-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .logo img {
+      height: 36px;
+      width: auto;
+      display: block;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .nav-links a {
+      font-weight: 500;
+      font-size: 14px;
+      color: #111827;
+    }
+
+    .nav-links a:hover {
+      color: #4f46e5;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-outline {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      font-weight: 500;
+      font-size: 14px;
+      color: #111827;
+      transition: all 0.2s ease;
+    }
+
+    .btn-outline:hover {
+      background: #111827;
+      color: #fff;
+    }
+
+    section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 20px;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .section-title h2 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    .section-title p {
+      color: #6b7280;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      max-width: 900px;
+      margin: 80px auto 40px;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    .hero h1 {
+      font-size: 2.6rem;
+      margin-bottom: 12px;
+    }
+
+    .hero p {
+      color: #6b7280;
+      margin-bottom: 32px;
+    }
+
+    .btn-primary {
+      padding: 14px 28px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(90deg, #4f46e5, #6366f1);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .status-grid,
+    .problems-grid,
+    .solutions-grid,
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .status-card,
+    .problem-card,
+    .solution-card,
+    .feature-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+    }
+
+    .problem-card {
+      border-left: 4px solid #ef4444;
+    }
+
+    .solution-card {
+      border-left: 4px solid #4f46e5;
+    }
+
+    .feature-card {
+      border-left: 4px solid #22c55e;
+    }
+
+    .final-cta {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: #fff;
+      border-radius: 24px;
+      padding: 60px 20px;
+      text-align: center;
+      max-width: 1000px;
+      margin: 80px auto;
+    }
+
+    .final-cta h2 {
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+
+    .final-cta p {
+      opacity: 0.9;
+      margin-bottom: 24px;
+    }
+
+    .final-cta a {
+      background: #ffffff;
+      color: #4f46e5;
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2.1rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo">
+        <img src="imagens/Image_fx (3).png" alt="Logo da Zenfily" />
+      </div>
+
+      <nav class="nav-links">
+        <a href="#problemas">Problemas</a>
+        <a href="#solucoes">Soluções</a>
+        <a href="#recursos">Recursos</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="formulario.html" class="btn-outline">Entrar na lista</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <h1>Prospecção de clientes para prestadores de serviço digitais</h1>
+    <p>
+      A Zenfily encontra, aborda e qualifica clientes ideais para você, para que você foque apenas em fechar contratos.
+    </p>
+    <a href="formulario.html" class="btn-primary">Quero receber clientes qualificados</a>
+  </section>
+
+  <!-- STATUS -->
+  <section id="produto">
+    <div class="section-title">
+      <h2>Somos uma empresa de prospecção, não apenas um software</h2>
+      <p>
+        Nosso foco é gerar oportunidades reais de negócio para prestadores de serviço digitais.
+      </p>
+    </div>
+
+    <div class="status-grid">
+      <div class="status-card">
+        <h3>🎯 Prospecção ativa</h3>
+        <p>
+          Buscamos e abordamos clientes ideais diariamente para você.
+        </p>
+      </div>
+
+      <div class="status-card">
+        <h3>🤖 Tecnologia própria</h3>
+        <p>
+          Usamos automação e IA para escalar a prospecção com qualidade.
+        </p>
+      </div>
+
+      <div class="status-card">
+        <h3>📈 Foco em contratos fechados</h3>
+        <p>
+          Nosso sucesso é medido em contratos, não em leads vazios.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEMAS -->
+  <section id="problemas">
+    <div class="section-title">
+      <h2>Por que prestadores de serviço perdem clientes</h2>
+      <p>
+        Mesmo sendo bons no que fazem, muitos não conseguem manter um fluxo constante de oportunidades.
+      </p>
+    </div>
+
+    <div class="problems-grid">
+      <div class="problem-card">
+        <h3>📉 Falta de leads qualificados</h3>
+        <p>
+          Chegam contatos, mas poucos têm real intenção de contratar.
+        </p>
+      </div>
+
+      <div class="problem-card">
+        <h3>🕐 Falta de tempo para prospectar</h3>
+        <p>
+          O trabalho consome o dia e a prospecção fica para depois — ou nunca.
+        </p>
+      </div>
+
+      <div class="problem-card">
+        <h3>❌ Abordagem errada</h3>
+        <p>
+          Mensagens genéricas afastam potenciais clientes.
+        </p>
+      </div>
+
+      <div class="problem-card">
+        <h3>🔁 Falta de consistência</h3>
+        <p>
+          Um mês bom, outro ruim — sem previsibilidade.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOLUÇÕES -->
+  <section id="solucoes">
+    <div class="section-title">
+      <h2>Como a Zenfily resolve isso</h2>
+      <p>
+        Nós cuidamos da prospecção para você.
+      </p>
+    </div>
+
+    <div class="solutions-grid">
+      <div class="solution-card">
+        <h3>🔍 Identificação do cliente ideal</h3>
+        <p>
+          Mapeamos exatamente quem você deve abordar.
+        </p>
+      </div>
+
+      <div class="solution-card">
+        <h3>✉️ Abordagem personalizada</h3>
+        <p>
+          Mensagens humanas e estratégicas, não spam.
+        </p>
+      </div>
+
+      <div class="solution-card">
+        <h3>🧠 Qualificação de leads</h3>
+        <p>
+          Você só fala com quem realmente tem potencial de fechar.
+        </p>
+      </div>
+
+      <div class="solution-card">
+        <h3>📊 Relatórios de oportunidades</h3>
+        <p>
+          Acompanhe resultados e oportunidades geradas.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- RECURSOS -->
+  <section id="recursos">
+    <div class="section-title">
+      <h2>Recursos e diferenciais</h2>
+      <p>
+        O que nos permite gerar clientes de forma consistente.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>🤖 Automação com IA</h3>
+        <p>
+          Escala com qualidade sem perder personalização.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <h3>📇 CRM interno</h3>
+        <p>
+          Organização total dos leads e histórico.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <h3>🎯 Segmentação avançada</h3>
+        <p>
+          Foco absoluto no cliente ideal.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <h3>🔐 Conformidade e segurança</h3>
+        <p>
+          Processos seguros e respeitando boas práticas.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="final-cta">
+    <h2>Receba clientes qualificados todas as semanas</h2>
+    <p>
+      Se você presta serviços digitais e quer previsibilidade em novos contratos, entre agora na lista de espera.
+    </p>
+    <a href="formulario.html">Quero clientes qualificados</a>
+  </section>
+
+</body>
+</html>
