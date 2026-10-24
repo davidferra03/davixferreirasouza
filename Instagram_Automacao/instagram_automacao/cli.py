@@ -9,7 +9,7 @@ from .dashboard import serve
 from .images import fit_three_by_four
 from .queue import set_paused
 from .queue import add_task
-from .storage import initialize, register_asset, update_profile, write_report
+from .storage import add_profile, initialize, register_asset, update_profile, write_report
 from .vem_engajar import inspect_window
 from .worker import run
 
@@ -28,6 +28,9 @@ def parser() -> argparse.ArgumentParser:
     image.add_argument("destination", type=Path)
     image.add_argument("--mode", choices=("pad", "crop"), default="pad")
     sub.add_parser("inspect-bot")
+    add = sub.add_parser("add-profile")
+    add.add_argument("--username")
+    add.add_argument("--count", type=int, default=1)
     worker = sub.add_parser("run")
     worker.add_argument("--once", action="store_true")
     profile = sub.add_parser("set-profile")
@@ -56,27 +59,35 @@ def main() -> None:
     args = parser().parse_args()
     settings = Settings.load(args.config)
     if args.command == "init":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         print(f"Estrutura criada em {settings.root}")
     elif args.command == "status":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         print(write_report(settings.root).read_text(encoding="utf-8"))
     elif args.command in ("pause", "resume"):
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         set_paused(settings.root, args.command == "pause")
         print("Fila pausada" if args.command == "pause" else "Fila liberada")
     elif args.command == "dashboard":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         serve(settings.root, args.port)
     elif args.command == "fit-image":
         print(fit_three_by_four(args.source, args.destination, args.mode))
     elif args.command == "inspect-bot":
         print(json.dumps([x.__dict__ for x in inspect_window()], ensure_ascii=False, indent=2))
+    elif args.command == "add-profile":
+        initialize(settings.root, settings.initial_profiles)
+        if args.count < 1:
+            raise SystemExit("--count deve ser pelo menos 1")
+        if args.username and args.count != 1:
+            raise SystemExit("--username só pode ser usado quando --count=1")
+        created = [add_profile(settings.root, args.username) for _ in range(args.count)]
+        print(json.dumps(created, ensure_ascii=False, indent=2))
     elif args.command == "run":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         print(f"Tarefas concluídas: {run(settings, args.once)}")
     elif args.command == "set-profile":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         update_profile(
             settings.root, args.profile_id, username=args.username,
             display_name=args.display_name, biography=args.biography,
@@ -86,11 +97,11 @@ def main() -> None:
         )
         print("Perfil atualizado")
     elif args.command == "enqueue":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         add_task(settings.root, args.profile_id, args.kind, json.loads(args.payload_json), args.idempotency_key)
         print("Tarefa enfileirada (ou já existente)")
     elif args.command == "register-asset":
-        initialize(settings.root, settings.profiles)
+        initialize(settings.root, settings.initial_profiles)
         print(register_asset(settings.root, args.profile_id, args.kind, args.path, args.prompt))
 
 

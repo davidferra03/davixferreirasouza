@@ -72,21 +72,41 @@ def connect(root: Path) -> sqlite3.Connection:
     return con
 
 
-def initialize(root: Path, count: int) -> None:
+def _create_profile_folders(root: Path, slot: str) -> None:
+    folder = root / slot
+    (folder / "avatar").mkdir(parents=True, exist_ok=True)
+    (folder / "publicacoes").mkdir(exist_ok=True)
+    for filename in ("biografia.txt", "prompts.txt"):
+        (folder / filename).touch(exist_ok=True)
+
+
+def initialize(root: Path, initial_profiles: int = 0) -> None:
     (root / "logs").mkdir(parents=True, exist_ok=True)
     with connect(root) as con:
-        for number in range(1, count + 1):
+        for number in range(1, initial_profiles + 1):
             slot = f"Perfil_{number:02d}"
-            folder = root / slot
-            (folder / "avatar").mkdir(parents=True, exist_ok=True)
-            (folder / "publicacoes").mkdir(exist_ok=True)
-            for filename in ("biografia.txt", "prompts.txt"):
-                (folder / filename).touch(exist_ok=True)
             con.execute(
                 "INSERT OR IGNORE INTO profiles(id, slot, updated_at) VALUES (?, ?, ?)",
                 (number, slot, now()),
             )
+            _create_profile_folders(root, slot)
     write_report(root)
+
+
+def add_profile(root: Path, username: str | None = None) -> dict:
+    """Create one profile with the next available numeric slot; there is no fixed limit."""
+    clean_username = username.strip().lstrip("@") if username else None
+    with connect(root) as con:
+        con.execute("BEGIN IMMEDIATE")
+        next_id = int(con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM profiles").fetchone()[0])
+        slot = f"Perfil_{next_id:02d}"
+        con.execute(
+            "INSERT INTO profiles(id, slot, instagram_username, updated_at) VALUES (?, ?, ?, ?)",
+            (next_id, slot, clean_username, now()),
+        )
+    _create_profile_folders(root, slot)
+    write_report(root)
+    return {"id": next_id, "slot": slot, "instagram_username": clean_username}
 
 
 def sha256(path: Path) -> str:

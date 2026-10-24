@@ -1,6 +1,6 @@
 # Instagram Automação
 
-Base local para Windows que organiza nove personagens virtuais, mantém uma fila
+Base local para Windows que organiza uma quantidade dinâmica de personagens virtuais, mantém uma fila
 recuperável e auditável, evita duplicidades e publica somente por integrações
 oficiais disponíveis. Ela não lê nem exporta cookies, senhas ou tokens.
 
@@ -12,9 +12,26 @@ No PowerShell, dentro desta pasta:
 .\iniciar.ps1
 ```
 
-O comando cria `.venv`, instala as dependências, inicializa `Perfil_01` a
-`Perfil_09`, `logs`, `state.sqlite3` e `relatorio.json`, e abre o painel em
+O comando cria `.venv`, instala as dependências, inicializa `logs`,
+`state.sqlite3` e `relatorio.json`, e abre o painel em
 `http://127.0.0.1:8765`.
+
+Não existe limite fixo de perfis. Para adicionar um perfil:
+
+```powershell
+instagram-automacao add-profile --username novo_personagem
+```
+
+Para reservar vários slots ainda sem username:
+
+```powershell
+instagram-automacao add-profile --count 20
+```
+
+Cada perfil recebe automaticamente seu próprio diretório (`Perfil_01`,
+`Perfil_02`, …, `Perfil_100`, etc.), avatar, publicações, biografia e prompts.
+Bancos criados pela versão anterior preservam os nove registros existentes e
+podem receber quantos novos perfis forem necessários.
 
 ## Segurança e limites
 
@@ -73,6 +90,7 @@ instagram-automacao pause
 instagram-automacao resume
 instagram-automacao dashboard
 instagram-automacao inspect-bot
+instagram-automacao add-profile --username novo_personagem
 instagram-automacao run
 pytest
 ```

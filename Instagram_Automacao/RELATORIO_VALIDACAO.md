@@ -6,7 +6,9 @@ Data: 24/10/2026
 
 - Compilação de todos os módulos Python: aprovada.
 - Testes automatizados: 2 aprovados.
-- Inicialização repetível de 9 perfis, diretórios, SQLite e relatório: aprovada.
+- Inicialização repetível e cadastro dinâmico de perfis, diretórios, SQLite e relatório: aprovada.
+- Cadastro em lote validado com 12 perfis via CLI; teste automatizado validado com
+  25 perfis e criação correta de `Perfil_25`.
 - Fila pausada por padrão, retomada, claim exclusivo e idempotência: aprovada.
 - Conversão de imagem horizontal para 3:4 sem esticar: aprovada.
 - Painel local e endpoint `/api/report`: resposta HTTP e JSON aprovados.
@@ -26,7 +28,7 @@ Data: 24/10/2026
 - O VEM ENGAJAR BOT mostra 9 contas, mas as demais não estão totalmente visíveis.
 
 Essas observações não foram gravadas nos slots porque não existe uma associação
-confirmada entre usernames e `Perfil_01` a `Perfil_09`.
+confirmada entre usernames e os slots locais.
 
 ## Não testado (bloqueio de ambiente)
 

@@ -9,7 +9,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     root: Path
-    profiles: int = 9
+    initial_profiles: int = 0
     target_posts: int = 7
     min_delay_seconds: int = 30
     max_delay_seconds: int = 60
@@ -30,7 +30,8 @@ class Settings:
         meta = raw.get("meta", {})
         return cls(
             root=root,
-            profiles=int(app.get("profiles", 9)),
+            # `profiles` is accepted for compatibility with early configurations.
+            initial_profiles=int(app.get("initial_profiles", app.get("profiles", 0))),
             target_posts=int(app.get("target_posts", 7)),
             min_delay_seconds=int(app.get("min_delay_seconds", 30)),
             max_delay_seconds=int(app.get("max_delay_seconds", 60)),

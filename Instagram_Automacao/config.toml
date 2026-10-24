@@ -1,5 +1,7 @@
 [app]
-profiles = 9
+# Quantos slots vazios criar apenas no primeiro uso. Novos perfis podem ser
+# adicionados a qualquer momento; não existe limite fixo.
+initial_profiles = 0
 target_posts = 7
 min_delay_seconds = 30
 max_delay_seconds = 60
