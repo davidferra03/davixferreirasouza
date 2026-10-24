@@ -72,9 +72,11 @@ instagram-automacao fit-image entrada.png saida.jpg --mode pad
 ## VEM ENGAJAR BOT
 
 Não foi fornecida documentação de API. `instagram-automacao inspect-bot` procura
-a janela via Windows UI Automation e faz somente leitura. A árvore de controles
-precisa ser calibrada localmente antes de autorizar botões como “Abrir navegador”
-ou “Verificar perfil”. A captura fornecida indica:
+a janela via Windows UI Automation e exporta sua árvore de controles em modo
+somente leitura para `logs/vem_engajar_uia.json`. Endereços de e-mail são
+ocultados no diagnóstico. A árvore precisa ser calibrada localmente antes de
+autorizar botões como “Abrir navegador” ou “Verificar perfil”. A captura
+fornecida indica:
 
 - `@gabrielmartins826392`: perfil completo, 7 posts — não alterar.
 - `@dailysar_inha3836`: faltam biografia e 7 posts.

@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import platform
-from dataclasses import dataclass
+import re
+from datetime import datetime, timezone
+
+EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 
 
-@dataclass(frozen=True)
-class AccountStatus:
-    username: str
-    complete: bool
-    missing_biography: bool = False
-    missing_avatar: bool = False
-    current_posts: int | None = None
+def redact(text: str) -> str:
+    return EMAIL.sub("[email ocultado]", text)
 
 
-def inspect_window() -> list[AccountStatus]:
-    """Read visible UI Automation text only; performs no task/interactions."""
+def inspect_window() -> dict:
+    """Export the visible UI Automation tree without clicking or typing."""
     if platform.system() != "Windows":
         raise RuntimeError("A inspeção do VEM ENGAJAR BOT requer execução local no Windows")
     from pywinauto import Desktop
@@ -22,9 +20,43 @@ def inspect_window() -> list[AccountStatus]:
     matches = Desktop(backend="uia").windows(title_re=".*VEM ENGAJAR BOT.*")
     if not matches:
         raise RuntimeError("Janela do VEM ENGAJAR BOT não encontrada")
-    texts = "\n".join(matches[0].texts())
-    # The application exposes no documented API in the supplied material. Keep
-    # discovery read-only until its actual UIA tree can be calibrated locally.
-    if not texts.strip():
+    window = matches[0]
+    controls = []
+    seen = set()
+    for control in [window, *window.descendants()]:
+        try:
+            name = redact(control.window_text().strip())
+            info = control.element_info
+            control_type = str(info.control_type or "")
+            automation_id = str(info.automation_id or "")
+            rectangle = control.rectangle()
+        except Exception:
+            continue
+        if not name and not automation_id:
+            continue
+        key = (name, control_type, automation_id, rectangle.left, rectangle.top)
+        if key in seen:
+            continue
+        seen.add(key)
+        controls.append({
+            "name": name[:500],
+            "control_type": control_type,
+            "automation_id": automation_id,
+            "rectangle": {
+                "left": rectangle.left,
+                "top": rectangle.top,
+                "right": rectangle.right,
+                "bottom": rectangle.bottom,
+            },
+        })
+        if len(controls) >= 1000:
+            break
+    if not controls:
         raise RuntimeError("A janela não expôs texto via UI Automation; use a exportação/manual assistida")
-    return []
+    return {
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "window_title": redact(window.window_text()),
+        "read_only": True,
+        "control_count": len(controls),
+        "controls": controls,
+    }

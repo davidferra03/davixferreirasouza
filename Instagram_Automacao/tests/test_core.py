@@ -5,6 +5,7 @@ from PIL import Image
 from instagram_automacao.images import fit_three_by_four
 from instagram_automacao.queue import add_task, claim_next, finish, is_paused, set_paused
 from instagram_automacao.storage import add_profile, connect, initialize
+from instagram_automacao.vem_engajar import redact
 
 
 def test_initialize_and_queue_are_idempotent(tmp_path: Path):
@@ -34,6 +35,11 @@ def test_profiles_are_dynamic_without_fixed_limit(tmp_path: Path):
     with connect(tmp_path) as con:
         assert con.execute("select count(*) from profiles").fetchone()[0] == 25
     assert (tmp_path / "Perfil_25" / "avatar").is_dir()
+
+
+def test_bot_diagnostic_redacts_email_addresses():
+    assert redact("conta usuario@example.com ativa") == "conta [email ocultado] ativa"
+    assert redact("@perfil_virtual") == "@perfil_virtual"
 
 
 def test_fit_three_by_four_without_stretching(tmp_path: Path):

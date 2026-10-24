@@ -27,7 +27,8 @@ def parser() -> argparse.ArgumentParser:
     image.add_argument("source", type=Path)
     image.add_argument("destination", type=Path)
     image.add_argument("--mode", choices=("pad", "crop"), default="pad")
-    sub.add_parser("inspect-bot")
+    inspect = sub.add_parser("inspect-bot")
+    inspect.add_argument("--output", type=Path)
     add = sub.add_parser("add-profile")
     add.add_argument("--username")
     add.add_argument("--count", type=int, default=1)
@@ -74,7 +75,13 @@ def main() -> None:
     elif args.command == "fit-image":
         print(fit_three_by_four(args.source, args.destination, args.mode))
     elif args.command == "inspect-bot":
-        print(json.dumps([x.__dict__ for x in inspect_window()], ensure_ascii=False, indent=2))
+        initialize(settings.root, settings.initial_profiles)
+        result = inspect_window()
+        output = args.output or settings.root / "logs" / "vem_engajar_uia.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Diagnóstico somente leitura salvo em: {output}")
+        print(f"Controles encontrados: {result['control_count']}")
     elif args.command == "add-profile":
         initialize(settings.root, settings.initial_profiles)
         if args.count < 1:
