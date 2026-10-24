@@ -15,6 +15,41 @@ def _unique_destination(directory: Path, filename: str) -> Path:
     return candidate
 
 
+def _save_latest_result(page, download_dir: Path, timeout_ms: int) -> Path:
+    more_options = page.get_by_role("button", name="Mais opções", description="Mais", exact=True)
+    count = more_options.count()
+    if count < 1:
+        raise RuntimeError("Nenhum resultado do Google Flow está disponível para download")
+    # The image overlay intercepts normal pointer clicks in the current Flow UI.
+    # Activating the already-resolved button through the DOM opens the same menu.
+    more_options.nth(count - 1).evaluate("element => element.click()")
+    menu_item = page.get_by_role("menuitem", name="2K Aprimorada")
+    menu_item.wait_for(state="visible", timeout=30_000)
+    with page.expect_download(timeout=timeout_ms) as event:
+        menu_item.click()
+    download = event.value
+    destination = _unique_destination(download_dir, download.suggested_filename)
+    download.save_as(destination)
+    return destination
+
+
+def download_latest(*, cdp_url: str, download_dir: Path, timeout_ms: int = 180_000) -> Path:
+    """Download the newest existing Flow result without starting a generation."""
+    os.environ.pop("PWDEBUG", None)
+    from playwright.sync_api import sync_playwright
+
+    download_dir.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as pw:
+        browser = pw.chromium.connect_over_cdp(cdp_url)
+        pages = [page for context in browser.contexts for page in context.pages if "flow.google.com" in page.url]
+        if not pages:
+            raise RuntimeError("Nenhuma aba do Google Flow foi encontrada no Chrome conectado")
+        destination = _save_latest_result(pages[-1], download_dir, timeout_ms)
+    if not destination.is_file() or destination.stat().st_size == 0:
+        raise RuntimeError("O download do Google Flow não produziu um arquivo válido")
+    return destination
+
+
 def generate_one(
     *, url: str, cdp_url: str | None, prompt: str, download_dir: Path,
     chrome_profile: Path, timeout_ms: int = 180_000,
@@ -86,12 +121,7 @@ def generate_one(
         else:
             raise TimeoutError("O Google Flow não apresentou um novo resultado dentro do prazo")
 
-        more_options.nth(more_options.count() - 1).click()
-        with page.expect_download(timeout=timeout_ms) as event:
-            page.get_by_role("menuitem", name="2K Aprimorada").click()
-        download = event.value
-        destination = _unique_destination(download_dir, download.suggested_filename)
-        download.save_as(destination)
+        destination = _save_latest_result(page, download_dir, timeout_ms)
         if not attached:
             context.close()
 

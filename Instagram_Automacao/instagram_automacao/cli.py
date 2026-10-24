@@ -6,10 +6,11 @@ from pathlib import Path
 
 from .config import Settings
 from .dashboard import serve
+from .flow import download_latest
 from .images import fit_three_by_four
 from .queue import set_paused
 from .queue import add_task
-from .storage import add_profile, initialize, register_asset, sync_bot_accounts, update_profile, write_report
+from .storage import add_profile, connect, initialize, register_asset, sync_bot_accounts, update_profile, write_report
 from .vem_engajar import inspect_window
 from .worker import execute, run
 
@@ -33,6 +34,8 @@ def parser() -> argparse.ArgumentParser:
     flow_test = sub.add_parser("flow-test")
     flow_test.add_argument("profile_id", type=int)
     flow_test.add_argument("--prompt", required=True)
+    recover_flow = sub.add_parser("flow-download-latest")
+    recover_flow.add_argument("profile_id", type=int)
     add = sub.add_parser("add-profile")
     add.add_argument("--username")
     add.add_argument("--count", type=int, default=1)
@@ -105,6 +108,18 @@ def main() -> None:
             "payload_json": json.dumps({"prompt": args.prompt}, ensure_ascii=False),
         })
         print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "flow-download-latest":
+        initialize(settings.root, settings.initial_profiles)
+        with connect(settings.root) as con:
+            profile = con.execute("SELECT * FROM profiles WHERE id=?", (args.profile_id,)).fetchone()
+        if profile is None:
+            raise SystemExit(f"Perfil inexistente: {args.profile_id}")
+        if not settings.flow_cdp_url:
+            raise SystemExit("google_flow.cdp_url não está configurado")
+        target = settings.root / profile["slot"] / "publicacoes"
+        downloaded = download_latest(cdp_url=settings.flow_cdp_url, download_dir=target)
+        asset_id = register_asset(settings.root, profile["id"], "publication", downloaded, "Resultado recuperado do Flow")
+        print(json.dumps({"asset_id": asset_id, "path": str(downloaded)}, ensure_ascii=False, indent=2))
     elif args.command == "add-profile":
         initialize(settings.root, settings.initial_profiles)
         if args.count < 1:
