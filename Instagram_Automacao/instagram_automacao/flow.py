@@ -42,15 +42,22 @@ def generate_one(
             )
 
         flow_pages = [page for page in context.pages if "flow.google.com" in page.url]
-        page = flow_pages[-1] if flow_pages else (context.pages[-1] if context.pages else context.new_page())
+        page = None
+        for candidate in reversed(flow_pages):
+            has_prompt = candidate.get_by_role("textbox", name="O que você quer criar?").count() > 0
+            has_new_project = candidate.get_by_role("button", name="Novo projeto").count() > 0
+            if has_prompt or has_new_project:
+                page = candidate
+                break
+        page = page or (flow_pages[-1] if flow_pages else (context.pages[-1] if context.pages else context.new_page()))
         if "flow.google.com" not in page.url:
             page.goto(url, wait_until="domcontentloaded")
 
-        new_project = page.get_by_role("button", name="Novo projeto")
-        new_project.wait_for(state="visible", timeout=timeout_ms)
-        new_project.click()
-
         prompt_box = page.get_by_role("textbox", name="O que você quer criar?")
+        if prompt_box.count() == 0:
+            new_project = page.get_by_role("button", name="Novo projeto")
+            new_project.wait_for(state="visible", timeout=30_000)
+            new_project.click()
         prompt_box.wait_for(state="visible", timeout=timeout_ms)
         settings = page.locator("flow-base-prompt-box").get_by_role("button", name="Configurações")
         settings.click()
