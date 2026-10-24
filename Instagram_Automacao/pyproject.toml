@@ -1,6 +1,6 @@
 [project]
 name = "instagram-automacao"
-version = "0.2.1"
+version = "0.3.0"
 description = "Automação local, recuperável e auditável para conteúdo de personagens virtuais"
 requires-python = ">=3.11"
 dependencies = [

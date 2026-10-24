@@ -153,6 +153,42 @@ def update_profile(
     write_report(root)
 
 
+def sync_bot_accounts(root: Path, accounts: list[dict], target_posts: int) -> list[dict]:
+    """Merge VEM ENGAJAR observations into local state without changing the app."""
+    synced = []
+    for observed in accounts:
+        username = observed["username"].strip().lstrip("@")
+        with connect(root) as con:
+            row = con.execute(
+                "SELECT * FROM profiles WHERE lower(instagram_username)=lower(?)", (username,)
+            ).fetchone()
+        if row is None:
+            created = add_profile(root, username)
+            profile_id = created["id"]
+            action = "created"
+        else:
+            profile_id = int(row["id"])
+            action = "updated"
+        complete = bool(observed.get("complete"))
+        with connect(root) as con:
+            con.execute(
+                """UPDATE profiles SET avatar_complete=?, biography_complete=?,
+                   posts_existing=CASE WHEN ? THEN MAX(posts_existing, ?) ELSE posts_existing END,
+                   status=?, last_error=NULL, updated_at=? WHERE id=?""",
+                (int(observed.get("avatar_complete", False)), int(complete), int(complete),
+                 target_posts, "complete" if complete else "pending", now(), profile_id),
+            )
+        synced.append({
+            "id": profile_id,
+            "username": username,
+            "action": action,
+            "status": "complete" if complete else "pending",
+            "avatar_complete": bool(observed.get("avatar_complete")),
+        })
+    write_report(root)
+    return synced
+
+
 def write_report(root: Path) -> Path:
     with connect(root) as con:
         profiles = [dict(row) for row in con.execute("SELECT * FROM profiles ORDER BY id")]

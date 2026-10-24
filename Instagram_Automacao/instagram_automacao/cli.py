@@ -9,7 +9,7 @@ from .dashboard import serve
 from .images import fit_three_by_four
 from .queue import set_paused
 from .queue import add_task
-from .storage import add_profile, initialize, register_asset, update_profile, write_report
+from .storage import add_profile, initialize, register_asset, sync_bot_accounts, update_profile, write_report
 from .vem_engajar import inspect_window
 from .worker import run
 
@@ -29,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
     image.add_argument("--mode", choices=("pad", "crop"), default="pad")
     inspect = sub.add_parser("inspect-bot")
     inspect.add_argument("--output", type=Path)
+    sub.add_parser("sync-bot")
     add = sub.add_parser("add-profile")
     add.add_argument("--username")
     add.add_argument("--count", type=int, default=1)
@@ -82,6 +83,13 @@ def main() -> None:
         output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Diagnóstico somente leitura salvo em: {output}")
         print(f"Controles encontrados: {result['control_count']}")
+        print(f"Contas identificadas: {len(result['accounts'])}")
+    elif args.command == "sync-bot":
+        initialize(settings.root, settings.initial_profiles)
+        result = inspect_window()
+        synced = sync_bot_accounts(settings.root, result["accounts"], settings.target_posts)
+        print(json.dumps(synced, ensure_ascii=False, indent=2))
+        print("Sincronização local concluída; nenhum botão do VEM ENGAJAR foi acionado.")
     elif args.command == "add-profile":
         initialize(settings.root, settings.initial_profiles)
         if args.count < 1:

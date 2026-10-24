@@ -1,9 +1,12 @@
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+$env:PYTHONUTF8 = "1"
 Set-Location $PSScriptRoot
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
   py -3.11 -m venv .venv
 }
-& .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e ".[windows]"
+& .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e ".[windows,dev]"
 & .\.venv\Scripts\python.exe -m playwright install chromium
 & .\.venv\Scripts\instagram-automacao.exe init
 $Dashboard = Join-Path $PSScriptRoot ".venv\Scripts\instagram-automacao.exe"

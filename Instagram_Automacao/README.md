@@ -84,6 +84,13 @@ fornecida indica:
 
 Os demais perfis não ficaram totalmente visíveis e não são inferidos.
 
+Depois que `inspect-bot` identificar as contas, sincronize os estados com o
+painel local sem clicar no aplicativo:
+
+```powershell
+instagram-automacao sync-bot
+```
+
 ## Comandos úteis
 
 ```powershell
