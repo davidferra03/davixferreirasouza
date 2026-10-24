@@ -1,0 +1,10 @@
+.venv/
+.chrome-flow/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+state.sqlite3*
+relatorio.json
+logs/*.log
+Perfil_*/avatar/*
+Perfil_*/publicacoes/*

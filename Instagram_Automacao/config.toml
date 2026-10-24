@@ -1,0 +1,16 @@
+[app]
+profiles = 9
+target_posts = 7
+min_delay_seconds = 30
+max_delay_seconds = 60
+
+[google_flow]
+url = "https://labs.google/fx/tools/flow"
+
+# Preencha após calibrar a interface atual com `playwright codegen`.
+# Nenhum seletor é inventado: a automação bloqueia com diagnóstico enquanto
+# estes valores não representarem os controles reais da sessão do usuário.
+[google_flow.selectors]
+
+[meta]
+api_version = "v24.0"

@@ -1,0 +1,19 @@
+[project]
+name = "instagram-automacao"
+version = "0.1.0"
+description = "Automação local, recuperável e auditável para conteúdo de personagens virtuais"
+requires-python = ">=3.11"
+dependencies = [
+  "Pillow>=10.4,<12",
+  "playwright>=1.48,<2",
+]
+
+[project.optional-dependencies]
+windows = ["pywinauto>=0.6.9,<1"]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+instagram-automacao = "instagram_automacao.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
