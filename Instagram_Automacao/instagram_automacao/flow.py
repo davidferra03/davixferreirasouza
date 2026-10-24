@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import time
 from pathlib import Path
@@ -19,6 +20,9 @@ def generate_one(
     chrome_profile: Path, timeout_ms: int = 180_000,
 ) -> Path:
     """Generate and download one image using the calibrated Portuguese Flow UI."""
+    # Calibration may leave this variable set in the parent PowerShell. Production
+    # runs must not pause and open Inspector unexpectedly.
+    os.environ.pop("PWDEBUG", None)
     from playwright.sync_api import sync_playwright
 
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -54,8 +58,12 @@ def generate_one(
             page.goto(url, wait_until="domcontentloaded")
 
         prompt_box = page.get_by_role("textbox", name="O que você quer criar?")
-        if prompt_box.count() == 0:
+        new_project = page.get_by_role("button", name="Novo projeto")
+        if prompt_box.count() == 0 and new_project.count() == 0:
+            page.goto(url, wait_until="domcontentloaded")
+            prompt_box = page.get_by_role("textbox", name="O que você quer criar?")
             new_project = page.get_by_role("button", name="Novo projeto")
+        if prompt_box.count() == 0:
             new_project.wait_for(state="visible", timeout=30_000)
             new_project.click()
         prompt_box.wait_for(state="visible", timeout=timeout_ms)
