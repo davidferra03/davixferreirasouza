@@ -28,7 +28,7 @@ def execute(settings: Settings, task: dict) -> dict:
         target = settings.root / profile["slot"] / "publicacoes"
         downloaded = generate_one(
             url=settings.flow_url,
-            selectors=settings.flow_selectors,
+            cdp_url=settings.flow_cdp_url,
             prompt=payload["prompt"],
             download_dir=target,
             chrome_profile=settings.root / ".chrome-flow",

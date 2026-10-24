@@ -57,9 +57,16 @@ interface do Flow muda, os seletores devem ser capturados na máquina Windows:
 .\.venv\Scripts\playwright.exe codegen https://labs.google/fx/tools/flow
 ```
 
-Depois, registre em `config.toml` os seletores reais para: modo de imagem,
-proporção, prompt, gerar, resultado e download. A automação exige exatamente um
-resultado, aguarda o elemento final e confirma que o download não está vazio.
+O fluxo foi calibrado para a interface em português: novo projeto, proporção 3:4,
+uma imagem e download 2K aprimorado. Por padrão, conecta ao Chrome dedicado em
+`http://127.0.0.1:9222`. A automação aguarda um resultado novo e confirma que o
+download não está vazio.
+
+Para um teste explícito que ignora a pausa global e gera somente uma imagem:
+
+```powershell
+instagram-automacao flow-test 1 --prompt "Seu prompt de teste"
+```
 Se o Flow não oferecer 3:4, use:
 
 ```powershell

@@ -7,7 +7,8 @@ min_delay_seconds = 30
 max_delay_seconds = 60
 
 [google_flow]
-url = "https://labs.google/fx/tools/flow"
+url = "https://flow.google.com/"
+cdp_url = "http://127.0.0.1:9222"
 
 # Preencha após calibrar a interface atual com `playwright codegen`.
 # Nenhum seletor é inventado: a automação bloqueia com diagnóstico enquanto

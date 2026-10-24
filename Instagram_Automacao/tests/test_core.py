@@ -2,6 +2,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from instagram_automacao.flow import _unique_destination
 from instagram_automacao.images import fit_three_by_four
 from instagram_automacao.queue import add_task, claim_next, finish, is_paused, set_paused
 from instagram_automacao.storage import add_profile, connect, initialize, sync_bot_accounts
@@ -40,6 +41,12 @@ def test_profiles_are_dynamic_without_fixed_limit(tmp_path: Path):
 def test_bot_diagnostic_redacts_email_addresses():
     assert redact("conta usuario@example.com ativa") == "conta [email ocultado] ativa"
     assert redact("@perfil_virtual") == "@perfil_virtual"
+
+
+def test_flow_download_never_overwrites(tmp_path: Path):
+    existing = tmp_path / "imagem.png"
+    existing.write_bytes(b"existing")
+    assert _unique_destination(tmp_path, "imagem.png") == tmp_path / "imagem-1.png"
 
 
 def test_parse_and_sync_bot_accounts(tmp_path: Path):

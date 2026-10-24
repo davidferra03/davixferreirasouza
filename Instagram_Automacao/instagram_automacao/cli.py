@@ -11,7 +11,7 @@ from .queue import set_paused
 from .queue import add_task
 from .storage import add_profile, initialize, register_asset, sync_bot_accounts, update_profile, write_report
 from .vem_engajar import inspect_window
-from .worker import run
+from .worker import execute, run
 
 
 def parser() -> argparse.ArgumentParser:
@@ -30,6 +30,9 @@ def parser() -> argparse.ArgumentParser:
     inspect = sub.add_parser("inspect-bot")
     inspect.add_argument("--output", type=Path)
     sub.add_parser("sync-bot")
+    flow_test = sub.add_parser("flow-test")
+    flow_test.add_argument("profile_id", type=int)
+    flow_test.add_argument("--prompt", required=True)
     add = sub.add_parser("add-profile")
     add.add_argument("--username")
     add.add_argument("--count", type=int, default=1)
@@ -94,6 +97,14 @@ def main() -> None:
         synced = sync_bot_accounts(settings.root, result["accounts"], settings.target_posts)
         print(json.dumps(synced, ensure_ascii=False, indent=2))
         print("Sincronização local concluída; nenhum botão do VEM ENGAJAR foi acionado.")
+    elif args.command == "flow-test":
+        initialize(settings.root, settings.initial_profiles)
+        result = execute(settings, {
+            "profile_id": args.profile_id,
+            "kind": "generate",
+            "payload_json": json.dumps({"prompt": args.prompt}, ensure_ascii=False),
+        })
+        print(json.dumps(result, ensure_ascii=False, indent=2))
     elif args.command == "add-profile":
         initialize(settings.root, settings.initial_profiles)
         if args.count < 1:

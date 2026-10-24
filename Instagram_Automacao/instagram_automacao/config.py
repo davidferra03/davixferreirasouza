@@ -13,7 +13,8 @@ class Settings:
     target_posts: int = 7
     min_delay_seconds: int = 30
     max_delay_seconds: int = 60
-    flow_url: str = "https://labs.google/fx/tools/flow"
+    flow_url: str = "https://flow.google.com/"
+    flow_cdp_url: str | None = "http://127.0.0.1:9222"
     flow_selectors: dict[str, str] = field(default_factory=dict)
     instagram_api_version: str = "v24.0"
 
@@ -36,6 +37,7 @@ class Settings:
             min_delay_seconds=int(app.get("min_delay_seconds", 30)),
             max_delay_seconds=int(app.get("max_delay_seconds", 60)),
             flow_url=str(flow.get("url", cls.flow_url)),
+            flow_cdp_url=str(flow["cdp_url"]) if flow.get("cdp_url") else None,
             flow_selectors=dict(flow.get("selectors", {})),
             instagram_api_version=str(meta.get("api_version", "v24.0")),
         )
