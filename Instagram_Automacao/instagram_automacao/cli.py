@@ -87,6 +87,10 @@ def main() -> None:
     elif args.command == "sync-bot":
         initialize(settings.root, settings.initial_profiles)
         result = inspect_window()
+        if not result["accounts"]:
+            raise RuntimeError(
+                "Nenhuma conta ficou acessível. Abra o VEM ENGAJAR na página Contas, aguarde o carregamento e tente novamente."
+            )
         synced = sync_bot_accounts(settings.root, result["accounts"], settings.target_posts)
         print(json.dumps(synced, ensure_ascii=False, indent=2))
         print("Sincronização local concluída; nenhum botão do VEM ENGAJAR foi acionado.")
