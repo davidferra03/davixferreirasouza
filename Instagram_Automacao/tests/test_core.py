@@ -1,8 +1,12 @@
+import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 
 from instagram_automacao.flow import _unique_destination
+from instagram_automacao import cli
 from instagram_automacao.images import fit_three_by_four
 from instagram_automacao.queue import add_task, claim_next, finish, is_paused, set_paused
 from instagram_automacao.storage import add_profile, connect, initialize, sync_bot_accounts, update_profile
@@ -117,14 +121,86 @@ def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_p
             "avatar_complete": None, "biography_complete": False, "posts_existing": 2,
         },
     ]
+    state = tmp_path / "state.sqlite3"
+    report = tmp_path / "relatorio.json"
+    profile_file = tmp_path / complete["slot"] / "biografia.txt"
+    before = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (state, report, profile_file)
+    }
     preview = sync_bot_accounts(tmp_path, accounts, 7, dry_run=True)
     assert preview[0]["action"] == "skipped_complete"
     assert preview[1]["action"] == "would_create"
+    assert not (tmp_path / "Perfil_02").exists()
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (state, report, profile_file)
+    } == before
     with connect(tmp_path) as con:
         rows = con.execute(
             "SELECT instagram_username, status, posts_existing FROM profiles ORDER BY id"
         ).fetchall()
     assert [tuple(row) for row in rows] == [("ja_completo", "complete", 12)]
+
+
+def test_inspect_cli_only_writes_requested_diagnostic(tmp_path: Path, monkeypatch):
+    diagnostic = {
+        "captured_at": "2026-10-25T00:00:00+00:00",
+        "window_title": "BOT VEM ENGAJAR",
+        "read_only": True,
+        "control_count": 1,
+        "controls": [],
+        "accounts": [],
+        "validation": {
+            "valid": False, "expected_account_count": None,
+            "observed_account_count": 0, "errors": ["captura vazia"],
+        },
+    }
+    monkeypatch.setattr(cli.Settings, "load", lambda _: SimpleNamespace(root=tmp_path))
+    monkeypatch.setattr(cli, "inspect_window", lambda: diagnostic)
+    monkeypatch.setattr(sys, "argv", ["instagram-automacao", "inspect-bot"])
+    cli.main()
+    output = tmp_path / "logs" / "vem_engajar_uia.json"
+    assert json.loads(output.read_text(encoding="utf-8")) == diagnostic
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == [
+        "logs", "logs/vem_engajar_uia.json",
+    ]
+
+
+def test_sync_cli_dry_run_does_not_initialize_or_rewrite_state(tmp_path: Path, monkeypatch):
+    initialize(tmp_path)
+    profile = add_profile(tmp_path, "existente")
+    state = tmp_path / "state.sqlite3"
+    report = tmp_path / "relatorio.json"
+    profile_file = tmp_path / profile["slot"] / "biografia.txt"
+    before = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (state, report, profile_file)
+    }
+    account = {
+        "username": "existente", "status": "pending", "complete": False,
+        "avatar_complete": None, "biography_complete": False, "posts_existing": 0,
+    }
+    diagnostic = {
+        "captured_at": "2026-10-25T00:00:00+00:00",
+        "window_title": "VEM ENGAJAR BOT", "read_only": True,
+        "control_count": 3, "controls": [], "accounts": [account],
+        "validation": {
+            "valid": True, "expected_account_count": 1,
+            "observed_account_count": 1, "errors": [],
+        },
+    }
+    settings = SimpleNamespace(root=tmp_path, target_posts=7, initial_profiles=99)
+    monkeypatch.setattr(cli.Settings, "load", lambda _: settings)
+    monkeypatch.setattr(cli, "inspect_window", lambda: diagnostic)
+    monkeypatch.setattr(sys, "argv", ["instagram-automacao", "sync-bot", "--dry-run"])
+    cli.main()
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (state, report, profile_file)
+    } == before
+    assert not (tmp_path / "Perfil_02").exists()
+    assert (tmp_path / "logs" / "vem_engajar_uia.json").is_file()
 
 
 def test_bot_sync_rejects_unknown_state_without_writing(tmp_path: Path):

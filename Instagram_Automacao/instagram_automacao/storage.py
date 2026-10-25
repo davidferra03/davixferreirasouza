@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -64,12 +68,44 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def connect(root: Path) -> sqlite3.Connection:
+@contextmanager
+def connect(root: Path) -> Iterator[sqlite3.Connection]:
     db = root / "state.sqlite3"
     con = sqlite3.connect(db)
     con.row_factory = sqlite3.Row
-    con.executescript(SCHEMA)
-    return con
+    try:
+        con.executescript(SCHEMA)
+        yield con
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
+@contextmanager
+def connect_read_only(root: Path) -> Iterator[sqlite3.Connection]:
+    """Read a disposable snapshot so SQLite cannot touch the live WAL files."""
+    db = (root / "state.sqlite3").resolve()
+    if not db.is_file():
+        raise FileNotFoundError(f"Banco local ainda não existe: {db}")
+    # Opening a WAL database with ``mode=ro`` may still checkpoint it and
+    # update metadata. Copy the database and sidecars first, then let SQLite
+    # operate only on that disposable snapshot.
+    with TemporaryDirectory(prefix="instagram-automacao-readonly-") as temporary:
+        snapshot = Path(temporary) / "state.sqlite3"
+        for suffix in ("", "-wal", "-shm"):
+            source = Path(f"{db}{suffix}")
+            if source.is_file():
+                shutil.copyfile(source, Path(f"{snapshot}{suffix}"))
+        con = sqlite3.connect(snapshot)
+        con.row_factory = sqlite3.Row
+        con.execute("PRAGMA query_only=ON")
+        try:
+            yield con
+        finally:
+            con.close()
 
 
 def _create_profile_folders(root: Path, slot: str) -> None:
@@ -175,8 +211,10 @@ def sync_bot_accounts(
     synced = []
     folders = []
     timestamp = now()
-    with connect(root) as con:
-        con.execute("BEGIN IMMEDIATE")
+    connection = connect_read_only(root) if dry_run else connect(root)
+    with connection as con:
+        if not dry_run:
+            con.execute("BEGIN IMMEDIATE")
         next_id = int(con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM profiles").fetchone()[0])
         for observed, username in zip(accounts, usernames):
             row = con.execute(
@@ -243,9 +281,6 @@ def sync_bot_accounts(
                 "status": status, "avatar_complete": bool(avatar_value),
                 "biography_complete": bool(biography_value), "posts_existing": posts_value,
             })
-        if dry_run:
-            con.rollback()
-
     if not dry_run:
         for slot in folders:
             _create_profile_folders(root, slot)

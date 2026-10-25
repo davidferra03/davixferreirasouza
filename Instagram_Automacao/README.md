@@ -106,6 +106,12 @@ completo” ou de requisito pendente. Estados ambíguos interrompem a operação
 campos sem evidência permanecem inalterados e perfis locais já completos são
 preservados.
 
+Execute `inspect-bot` e `sync-bot` no PowerShell do mesmo usuário e sessão que
+abriu o VEM ENGAJAR. Um Codex executado como `CodexSandboxOffline` pode não
+enxergar a janela do aplicativo. `inspect-bot` escreve somente a captura em
+`logs`; `sync-bot --dry-run` abre o banco em modo somente leitura e não atualiza
+o relatório nem as pastas dos perfis.
+
 ## Comandos úteis
 
 ```powershell

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import getpass
+import os
 import platform
 import re
 from datetime import datetime, timezone
@@ -140,10 +142,29 @@ def inspect_window() -> dict:
         raise RuntimeError("A inspeção do VEM ENGAJAR BOT requer execução local no Windows")
     from pywinauto import Desktop
 
-    matches = Desktop(backend="uia").windows(title_re=".*VEM ENGAJAR BOT.*")
-    if not matches:
-        raise RuntimeError("Janela do VEM ENGAJAR BOT não encontrada")
-    window = matches[0]
+    candidates = []
+    for window in Desktop(backend="uia").windows(visible_only=False):
+        try:
+            title = window.window_text().strip()
+            folded = title.casefold()
+            if not all(token in folded for token in ("vem", "engajar", "bot")):
+                continue
+            rectangle = window.rectangle()
+            area = max(0, rectangle.width()) * max(0, rectangle.height())
+            exact_title = folded in {"vem engajar bot", "bot vem engajar"}
+            candidates.append((exact_title, bool(window.is_visible()), area, title, window))
+        except Exception:
+            continue
+    candidates.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    if not candidates:
+        current_user = getpass.getuser()
+        session = os.environ.get("SESSIONNAME", "desconhecida")
+        raise RuntimeError(
+            "Janela do VEM ENGAJAR BOT não encontrada no mesmo desktop do "
+            f"usuário {current_user} (sessão {session}). Execute este comando "
+            "no PowerShell do mesmo usuário que abriu o VEM."
+        )
+    window = candidates[0][4]
     controls = []
     seen = set()
     for control in [window, *window.descendants()]:

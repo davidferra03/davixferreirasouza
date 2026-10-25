@@ -83,7 +83,6 @@ def main() -> None:
     elif args.command == "fit-image":
         print(fit_three_by_four(args.source, args.destination, args.mode))
     elif args.command == "inspect-bot":
-        initialize(settings.root, settings.initial_profiles)
         result = inspect_window()
         output = args.output or settings.root / "logs" / "vem_engajar_uia.json"
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +95,6 @@ def main() -> None:
         if validation["errors"]:
             print("Motivos: " + "; ".join(validation["errors"]))
     elif args.command == "sync-bot":
-        initialize(settings.root, settings.initial_profiles)
         result = inspect_window()
         output = settings.root / "logs" / "vem_engajar_uia.json"
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -104,6 +102,8 @@ def main() -> None:
         validation = result.get("validation") or validate_diagnostic(result)
         if not validation["valid"]:
             raise RuntimeError("Captura insegura para sincronização: " + "; ".join(validation["errors"]))
+        if not args.dry_run:
+            initialize(settings.root, settings.initial_profiles)
         synced = sync_bot_accounts(
             settings.root, result["accounts"], settings.target_posts, dry_run=args.dry_run,
         )
