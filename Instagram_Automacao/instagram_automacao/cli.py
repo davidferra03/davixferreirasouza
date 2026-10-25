@@ -10,7 +10,10 @@ from .flow import download_latest
 from .images import fit_three_by_four
 from .queue import set_paused
 from .queue import add_task
-from .storage import add_profile, connect, initialize, register_asset, sync_bot_accounts, update_profile, write_report
+from .storage import (
+    add_profile, confirmed_complete_usernames, connect, initialize, register_asset,
+    sync_bot_accounts, update_profile, write_report,
+)
 from .vem_engajar import inspect_window, validate_diagnostic
 from .worker import execute, run
 
@@ -84,22 +87,30 @@ def main() -> None:
         print(fit_three_by_four(args.source, args.destination, args.mode))
     elif args.command == "inspect-bot":
         result = inspect_window()
+        validation = validate_diagnostic(
+            result, allowed_unknown_usernames=confirmed_complete_usernames(settings.root),
+        )
+        result["validation"] = validation
         output = args.output or settings.root / "logs" / "vem_engajar_uia.json"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Diagnóstico somente leitura salvo em: {output}")
         print(f"Controles encontrados: {result['control_count']}")
         print(f"Contas identificadas: {len(result['accounts'])}")
-        validation = result.get("validation") or validate_diagnostic(result)
         print(f"Captura válida para sincronização: {'sim' if validation['valid'] else 'não'}")
         if validation["errors"]:
             print("Motivos: " + "; ".join(validation["errors"]))
+        if validation["warnings"]:
+            print("Avisos: " + "; ".join(validation["warnings"]))
     elif args.command == "sync-bot":
         result = inspect_window()
+        validation = validate_diagnostic(
+            result, allowed_unknown_usernames=confirmed_complete_usernames(settings.root),
+        )
+        result["validation"] = validation
         output = settings.root / "logs" / "vem_engajar_uia.json"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        validation = result.get("validation") or validate_diagnostic(result)
         if not validation["valid"]:
             raise RuntimeError("Captura insegura para sincronização: " + "; ".join(validation["errors"]))
         if not args.dry_run:

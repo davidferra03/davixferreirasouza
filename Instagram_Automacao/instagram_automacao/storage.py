@@ -108,6 +108,21 @@ def connect_read_only(root: Path) -> Iterator[sqlite3.Connection]:
             con.close()
 
 
+def confirmed_complete_usernames(root: Path) -> set[str]:
+    """Return normalized usernames already confirmed complete in local state."""
+    if not (root / "state.sqlite3").is_file():
+        return set()
+    with connect_read_only(root) as con:
+        rows = con.execute(
+            """SELECT instagram_username FROM profiles
+               WHERE status='complete' AND instagram_username IS NOT NULL"""
+        ).fetchall()
+    return {
+        str(row["instagram_username"]).strip().lstrip("@").casefold()
+        for row in rows if str(row["instagram_username"]).strip().lstrip("@")
+    }
+
+
 def _create_profile_folders(root: Path, slot: str) -> None:
     folder = root / slot
     (folder / "avatar").mkdir(parents=True, exist_ok=True)
@@ -205,8 +220,8 @@ def sync_bot_accounts(
     normalized = [username.casefold() for username in usernames]
     if len(normalized) != len(set(normalized)):
         raise ValueError("Existem usernames duplicados na captura")
-    if any(account.get("status") not in {"complete", "pending"} for account in accounts):
-        raise ValueError("A captura contém conta sem estado explícito")
+    if any(account.get("status") not in {"complete", "pending", "unknown"} for account in accounts):
+        raise ValueError("A captura contém estado de conta inválido")
 
     synced = []
     folders = []
@@ -220,6 +235,24 @@ def sync_bot_accounts(
             row = con.execute(
                 "SELECT * FROM profiles WHERE lower(instagram_username)=lower(?)", (username,)
             ).fetchone()
+            if observed["status"] == "unknown":
+                if observed.get("status_evidence") == "conflicting_badges" or observed.get("missing"):
+                    raise ValueError(
+                        f"Estado desconhecido contém evidência conflitante ou pendente: {username}"
+                    )
+                if row is None or row["status"] != "complete":
+                    raise ValueError(
+                        f"Estado desconhecido só pode preservar perfil local completo: {username}"
+                    )
+                if observed.get("blocked") is not False or observed.get("avatar_complete") is not True:
+                    raise ValueError(
+                        f"Evidência insuficiente para preservar perfil local completo: {username}"
+                    )
+                synced.append({
+                    "id": int(row["id"]), "username": username,
+                    "action": "skipped_complete_unconfirmed", "status": "complete",
+                })
+                continue
             if row is not None and row["status"] == "complete":
                 synced.append({
                     "id": int(row["id"]), "username": username,

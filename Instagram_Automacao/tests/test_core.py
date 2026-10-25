@@ -103,6 +103,150 @@ def test_bot_capture_requires_counter_unique_accounts_and_explicit_status():
     assert any("sem evidência" in error for error in validation["errors"])
 
 
+def test_real_uia_shape_uses_tab_counter_and_preserves_local_complete_unknown():
+    controls = [
+        {"name": "Todas as contas 2", "control_type": "TabItem", "rectangle": {"left": 313, "top": 345, "right": 475, "bottom": 383}},
+        {"name": "Conta @pendente", "control_type": "ListItem", "rectangle": {"left": 313, "top": 463, "right": 1368, "bottom": 568}},
+        {"name": "Perfil verificado em", "control_type": "Text", "rectangle": {"left": 622, "top": 507, "right": 745, "bottom": 526}},
+        {"name": "Bloqueada nas tarefas do bot até completar o perfil no Instagram.", "control_type": "Text", "rectangle": {"left": 369, "top": 531, "right": 789, "bottom": 550}},
+        {"name": "Verificar o perfil da conta @pendente", "control_type": "Button", "rectangle": {"left": 972, "top": 499, "right": 1086, "bottom": 531}},
+        {"name": "Abrir navegador da conta @pendente", "control_type": "Button", "rectangle": {"left": 1093, "top": 499, "right": 1223, "bottom": 531}},
+        {"name": "Fechar navegador da conta @pendente", "control_type": "Button", "rectangle": {"left": 1230, "top": 499, "right": 1368, "bottom": 531}},
+        {"name": "Conta @completo", "control_type": "ListItem", "rectangle": {"left": 313, "top": 568, "right": 1368, "bottom": 649}},
+        {"name": "Foto de perfil de @completo", "control_type": "Image", "rectangle": {"left": 313, "top": 586, "right": 357, "bottom": 630}},
+        {"name": "Perfil verificado em", "control_type": "Text", "rectangle": {"left": 622, "top": 612, "right": 745, "bottom": 631}},
+        {"name": "Verificar o perfil da conta @completo", "control_type": "Button", "rectangle": {"left": 972, "top": 592, "right": 1086, "bottom": 624}},
+        {"name": "Abrir navegador da conta @completo", "control_type": "Button", "rectangle": {"left": 1093, "top": 592, "right": 1223, "bottom": 624}},
+        {"name": "Fechar navegador da conta @completo", "control_type": "Button", "rectangle": {"left": 1230, "top": 592, "right": 1368, "bottom": 624}},
+    ]
+    diagnostic = {"controls": controls}
+    accounts = parse_accounts(diagnostic)
+    diagnostic["accounts"] = accounts
+    strict_validation = validate_diagnostic(diagnostic)
+    assert not strict_validation["valid"]
+    assert strict_validation["errors"] == ["estado sem evidência explícita: completo"]
+    validation = validate_diagnostic(diagnostic, allowed_unknown_usernames={"completo"})
+    assert validation == {
+        "valid": True,
+        "expected_account_count": 2,
+        "observed_account_count": 2,
+        "errors": [],
+        "warnings": [
+            "estado UIA não exposto para completo; perfil local completo será apenas preservado"
+        ],
+    }
+    assert accounts[0]["status"] == "pending"
+    assert accounts[0]["status_evidence"] == "explicit_pending_warning"
+    assert accounts[1]["status"] == "unknown"
+    assert accounts[1]["status_evidence"] == "insufficient_evidence"
+
+
+def test_avatar_and_actions_without_explicit_badge_remain_unknown():
+    controls = [
+        {"name": "1 contas", "control_type": "Text", "rectangle": {"left": 0, "top": 0, "right": 50, "bottom": 10}},
+        {"name": "Conta @duvidoso", "control_type": "ListItem", "rectangle": {"left": 10, "top": 100, "right": 500, "bottom": 220}},
+        {"name": "Foto de perfil de @duvidoso", "control_type": "Image", "rectangle": {"left": 20, "top": 120, "right": 60, "bottom": 160}},
+        {"name": "Perfil verificado em", "control_type": "Text", "rectangle": {"left": 100, "top": 130, "right": 220, "bottom": 150}},
+        {"name": "Verificar o perfil da conta @duvidoso", "control_type": "Button", "rectangle": {"left": 300, "top": 180, "right": 400, "bottom": 210}},
+        {"name": "Abrir navegador da conta @duvidoso", "control_type": "Button", "rectangle": {"left": 200, "top": 180, "right": 290, "bottom": 210}},
+        {"name": "Fechar navegador da conta @duvidoso", "control_type": "Button", "rectangle": {"left": 100, "top": 180, "right": 190, "bottom": 210}},
+    ]
+    account = parse_accounts({"controls": controls})[0]
+    assert account["status"] == "unknown"
+    assert account["status_evidence"] == "insufficient_evidence"
+
+
+def test_allowed_unknown_still_requires_unblocked_avatar_evidence():
+    base = {
+        "controls": [{"name": "1 contas", "control_type": "Text", "rectangle": {}}],
+    }
+    blocked = {
+        **base,
+        "accounts": [{
+            "username": "local_complete", "status": "unknown",
+            "blocked": True, "avatar_complete": True,
+        }],
+    }
+    blocked_validation = validate_diagnostic(
+        blocked, allowed_unknown_usernames={"local_complete"},
+    )
+    assert not blocked_validation["valid"]
+    assert blocked_validation["errors"] == [
+        "perfil local completo apareceu bloqueado: local_complete"
+    ]
+
+    avatar_missing = {
+        **base,
+        "accounts": [{
+            "username": "local_complete", "status": "unknown",
+            "blocked": False, "avatar_complete": None,
+        }],
+    }
+    avatar_validation = validate_diagnostic(
+        avatar_missing, allowed_unknown_usernames={"local_complete"},
+    )
+    assert not avatar_validation["valid"]
+    assert avatar_validation["errors"] == [
+        "perfil local completo sem avatar confirmado na captura: local_complete"
+    ]
+
+    conflicting = {
+        **base,
+        "accounts": [{
+            "username": "local_complete", "status": "unknown",
+            "status_evidence": "conflicting_badges", "missing": [],
+            "blocked": False, "avatar_complete": True,
+        }],
+    }
+    conflicting_validation = validate_diagnostic(
+        conflicting, allowed_unknown_usernames={"local_complete"},
+    )
+    assert conflicting_validation["errors"] == ["selos conflitantes para local_complete"]
+
+    missing = {
+        **base,
+        "accounts": [{
+            "username": "local_complete", "status": "unknown",
+            "status_evidence": "insufficient_evidence", "missing": ["Falta: Biografia"],
+            "blocked": False, "avatar_complete": True,
+        }],
+    }
+    missing_validation = validate_diagnostic(
+        missing, allowed_unknown_usernames={"local_complete"},
+    )
+    assert missing_validation["errors"] == [
+        "estado desconhecido com requisitos pendentes para local_complete"
+    ]
+
+    invalid = {
+        **base,
+        "accounts": [{
+            "username": "local_complete", "status": "surpresa",
+            "blocked": False, "avatar_complete": True,
+        }],
+    }
+    invalid_validation = validate_diagnostic(
+        invalid, allowed_unknown_usernames={"local_complete"},
+    )
+    assert invalid_validation["errors"] == [
+        "estado inválido para local_complete: 'surpresa'"
+    ]
+
+
+def test_conflicting_account_counters_are_fatal():
+    diagnostic = {
+        "controls": [
+            {"name": "9 contas", "control_type": "Text", "rectangle": {}},
+            {"name": "Todas as contas 8", "control_type": "TabItem", "rectangle": {}},
+        ],
+        "accounts": [],
+    }
+    validation = validate_diagnostic(diagnostic)
+    assert not validation["valid"]
+    assert validation["expected_account_count"] is None
+    assert any("contadores totais conflitantes" in error for error in validation["errors"])
+
+
 def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_path: Path):
     initialize(tmp_path)
     complete = add_profile(tmp_path, "ja_completo")
@@ -113,8 +257,9 @@ def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_p
     )
     accounts = [
         {
-            "username": "ja_completo", "status": "pending", "complete": False,
-            "avatar_complete": False, "biography_complete": False, "posts_existing": 0,
+            "username": "ja_completo", "status": "unknown", "complete": None,
+            "blocked": False, "avatar_complete": True,
+            "biography_complete": None, "posts_existing": None,
         },
         {
             "username": "novo", "status": "pending", "complete": False,
@@ -129,7 +274,7 @@ def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_p
         for path in (state, report, profile_file)
     }
     preview = sync_bot_accounts(tmp_path, accounts, 7, dry_run=True)
-    assert preview[0]["action"] == "skipped_complete"
+    assert preview[0]["action"] == "skipped_complete_unconfirmed"
     assert preview[1]["action"] == "would_create"
     assert not (tmp_path / "Perfil_02").exists()
     assert {
@@ -141,6 +286,48 @@ def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_p
             "SELECT instagram_username, status, posts_existing FROM profiles ORDER BY id"
         ).fetchall()
     assert [tuple(row) for row in rows] == [("ja_completo", "complete", 12)]
+
+
+def test_bot_sync_reinforces_unknown_preservation_evidence(tmp_path: Path):
+    initialize(tmp_path)
+    complete = add_profile(tmp_path, "ja_completo")
+    update_profile(
+        tmp_path, complete["id"], username="ja_completo", display_name=None,
+        biography=None, avatar_complete=True, biography_complete=True,
+        posts_existing=7, complete=True,
+    )
+    state = tmp_path / "state.sqlite3"
+    before = state.read_bytes()
+    account = {
+        "username": "ja_completo", "status": "unknown", "complete": None,
+        "blocked": True, "avatar_complete": True,
+        "biography_complete": None, "posts_existing": None,
+    }
+    try:
+        sync_bot_accounts(tmp_path, [account], 7, dry_run=True)
+    except ValueError as error:
+        assert "Evidência insuficiente" in str(error)
+    else:
+        raise AssertionError("unknown bloqueado deveria impedir até a simulação")
+    assert state.read_bytes() == before
+
+    for unsafe in (
+        {
+            **account, "blocked": False,
+            "status_evidence": "conflicting_badges", "missing": [],
+        },
+        {
+            **account, "blocked": False,
+            "status_evidence": "insufficient_evidence", "missing": ["Falta: Biografia"],
+        },
+    ):
+        try:
+            sync_bot_accounts(tmp_path, [unsafe], 7, dry_run=True)
+        except ValueError as error:
+            assert "evidência conflitante ou pendente" in str(error)
+        else:
+            raise AssertionError("unknown conflitante/pendente deveria ser rejeitado")
+        assert state.read_bytes() == before
 
 
 def test_inspect_cli_only_writes_requested_diagnostic(tmp_path: Path, monkeypatch):
@@ -184,7 +371,11 @@ def test_sync_cli_dry_run_does_not_initialize_or_rewrite_state(tmp_path: Path, m
     diagnostic = {
         "captured_at": "2026-10-25T00:00:00+00:00",
         "window_title": "VEM ENGAJAR BOT", "read_only": True,
-        "control_count": 3, "controls": [], "accounts": [account],
+        "control_count": 3,
+        "controls": [
+            {"name": "1 contas", "control_type": "Text", "rectangle": {}},
+        ],
+        "accounts": [account],
         "validation": {
             "valid": True, "expected_account_count": 1,
             "observed_account_count": 1, "errors": [],
@@ -208,7 +399,7 @@ def test_bot_sync_rejects_unknown_state_without_writing(tmp_path: Path):
     try:
         sync_bot_accounts(tmp_path, [{"username": "duvidoso", "status": "unknown"}], 7)
     except ValueError as error:
-        assert "sem estado explícito" in str(error)
+        assert "Estado desconhecido" in str(error)
     else:
         raise AssertionError("estado desconhecido deveria impedir sincronização")
     with connect(tmp_path) as con:

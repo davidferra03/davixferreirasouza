@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 ACCOUNT_COUNT = re.compile(r"\b(\d+)\s+contas?\b", re.IGNORECASE)
+TAB_ACCOUNT_COUNT = re.compile(r"\btodas\s+as\s+contas\s*[:(\[]?\s*(\d+)\b", re.IGNORECASE)
 POST_COUNT = re.compile(r"\btem\s+(\d+)\s*,\s*m[ií]nimo\s+(\d+)\b", re.IGNORECASE)
 
 
@@ -16,19 +17,25 @@ def redact(text: str) -> str:
 
 
 def expected_account_count(diagnostic: dict) -> int | None:
-    """Read the explicit account counter exposed by the VEM UI."""
+    """Read one consistent explicit account counter from the VEM UI."""
     values = []
     for control in diagnostic.get("controls", []):
-        for match in ACCOUNT_COUNT.finditer(control.get("name", "")):
-            values.append(int(match.group(1)))
-    return max(values) if values else None
+        name = control.get("name", "")
+        for pattern in (ACCOUNT_COUNT, TAB_ACCOUNT_COUNT):
+            for match in pattern.finditer(name):
+                values.append(int(match.group(1)))
+    unique = sorted(set(values))
+    if len(unique) > 1:
+        raise ValueError("contadores totais conflitantes: " + ", ".join(map(str, unique)))
+    return unique[0] if unique else None
 
 
 def parse_accounts(diagnostic: dict) -> list[dict]:
     """Associate accessible descendants with an account card conservatively.
 
-    Missing UIA text is not evidence that a requirement is complete. A card is
-    complete only when the UI exposes the explicit ``Perfil completo`` badge.
+    Missing UIA text, card geometry and the presence of an avatar are not
+    evidence that a requirement is complete. Only the explicit ``Perfil
+    completo`` badge may promote an observation to complete.
     """
     controls = diagnostic.get("controls", [])
     accounts = []
@@ -50,24 +57,30 @@ def parse_accounts(diagnostic: dict) -> list[dict]:
         complete_badge = any("perfil completo" in name for name in folded)
         missing = [name.strip() for name in names if "falta:" in name.casefold()]
         has_missing = bool(missing)
-        conflicting = complete_badge and (has_missing or blocked)
-        if conflicting:
-            status = "unknown"
-            complete = None
-        elif complete_badge:
-            status = "complete"
-            complete = True
-        elif has_missing or blocked:
-            status = "pending"
-            complete = False
-        else:
-            status = "unknown"
-            complete = None
-
         avatar_image = any(
             control.get("control_type") == "Image" and f"@{username}" in control.get("name", "")
             for control in children
         )
+        can_verify = any("verificar o perfil" in name for name in folded)
+        can_open_browser = any("abrir navegador" in name for name in folded)
+        can_close_browser = any("fechar navegador" in name for name in folded)
+        conflicting = complete_badge and (has_missing or blocked)
+        if conflicting:
+            status = "unknown"
+            complete = None
+            status_evidence = "conflicting_badges"
+        elif complete_badge:
+            status = "complete"
+            complete = True
+            status_evidence = "explicit_complete_badge"
+        elif has_missing or blocked:
+            status = "pending"
+            complete = False
+            status_evidence = "explicit_pending_warning"
+        else:
+            status = "unknown"
+            complete = None
+            status_evidence = "insufficient_evidence"
         missing_avatar = any(
             "falta:" in name and ("avatar" in name or "foto" in name)
             for name in folded
@@ -92,6 +105,7 @@ def parse_accounts(diagnostic: dict) -> list[dict]:
         accounts.append({
             "username": username,
             "status": status,
+            "status_evidence": status_evidence,
             "complete": complete,
             "blocked": blocked,
             "avatar_complete": avatar_complete,
@@ -99,20 +113,36 @@ def parse_accounts(diagnostic: dict) -> list[dict]:
             "posts_existing": posts_existing,
             "posts_minimum": posts_minimum,
             "missing": missing,
-            "can_verify": any("verificar o perfil" in name.casefold() for name in names),
-            "can_open_browser": any("abrir navegador" in name.casefold() for name in names),
-            "can_close_browser": any("fechar navegador" in name.casefold() for name in names),
+            "can_verify": can_verify,
+            "can_open_browser": can_open_browser,
+            "can_close_browser": can_close_browser,
         })
     return accounts
 
 
-def validate_diagnostic(diagnostic: dict) -> dict:
-    """Reject partial/ambiguous captures before they can alter local state."""
+def validate_diagnostic(
+    diagnostic: dict, *, allowed_unknown_usernames: set[str] | None = None,
+) -> dict:
+    """Reject partial/ambiguous captures before they can alter local state.
+
+    An unknown observation may pass only as a preservation exception for a
+    username already confirmed complete in local state. It must still expose a
+    profile image and no blocked warning; it is never promoted from UIA data.
+    """
     accounts = diagnostic.get("accounts") or parse_accounts(diagnostic)
-    expected = expected_account_count(diagnostic)
+    allowed = {username.strip().lstrip("@").casefold() for username in (allowed_unknown_usernames or set())}
+    try:
+        expected = expected_account_count(diagnostic)
+        count_error = None
+    except ValueError as error:
+        expected = None
+        count_error = str(error)
     errors = []
+    warnings = []
     usernames = [str(account.get("username", "")).strip().casefold() for account in accounts]
-    if expected is None:
+    if count_error:
+        errors.append(count_error)
+    elif expected is None:
         errors.append("contador total de contas não encontrado")
     elif expected != len(accounts):
         errors.append(f"contador indica {expected}, mas {len(accounts)} cartões foram lidos")
@@ -122,17 +152,34 @@ def validate_diagnostic(diagnostic: dict) -> dict:
         errors.append("existe conta sem username")
     if len(usernames) != len(set(usernames)):
         errors.append("existem usernames duplicados")
-    unknown = [
-        account.get("username", "") for account in accounts
-        if account.get("status") not in {"complete", "pending"}
-    ]
-    if unknown:
-        errors.append("estado sem evidência explícita: " + ", ".join(unknown))
+    for account in accounts:
+        status = account.get("status")
+        if status in {"complete", "pending"}:
+            continue
+        username = str(account.get("username", "")).strip().lstrip("@")
+        normalized_username = username.casefold()
+        if status != "unknown":
+            errors.append(f"estado inválido para {username}: {status!r}")
+        elif account.get("status_evidence") == "conflicting_badges":
+            errors.append(f"selos conflitantes para {username}")
+        elif account.get("missing"):
+            errors.append(f"estado desconhecido com requisitos pendentes para {username}")
+        elif normalized_username not in allowed:
+            errors.append(f"estado sem evidência explícita: {username}")
+        elif account.get("blocked") is not False:
+            errors.append(f"perfil local completo apareceu bloqueado: {username}")
+        elif account.get("avatar_complete") is not True:
+            errors.append(f"perfil local completo sem avatar confirmado na captura: {username}")
+        else:
+            warnings.append(
+                f"estado UIA não exposto para {username}; perfil local completo será apenas preservado"
+            )
     return {
         "valid": not errors,
         "expected_account_count": expected,
         "observed_account_count": len(accounts),
         "errors": errors,
+        "warnings": warnings,
     }
 
 

@@ -106,6 +106,12 @@ completo” ou de requisito pendente. Estados ambíguos interrompem a operação
 campos sem evidência permanecem inalterados e perfis locais já completos são
 preservados.
 
+Na versão atual do VEM, o selo visual “Perfil completo” pode não aparecer na
+árvore UIA. Nesse caso a conta permanece `unknown`: ela só é aceita quando o
+mesmo username já está confirmado como completo no banco local, possui avatar
+visível e não apresenta bloqueio. A ação é apenas preservar/ignorar o perfil;
+a ausência do selo nunca promove uma conta a completa.
+
 Execute `inspect-bot` e `sync-bot` no PowerShell do mesmo usuário e sessão que
 abriu o VEM ENGAJAR. Um Codex executado como `CodexSandboxOffline` pode não
 enxergar a janela do aplicativo. `inspect-bot` escreve somente a captura em
