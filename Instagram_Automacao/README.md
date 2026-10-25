@@ -82,14 +82,13 @@ Não foi fornecida documentação de API. `instagram-automacao inspect-bot` proc
 a janela via Windows UI Automation e exporta sua árvore de controles em modo
 somente leitura para `logs/vem_engajar_uia.json`. Endereços de e-mail são
 ocultados no diagnóstico. A árvore precisa ser calibrada localmente antes de
-autorizar botões como “Abrir navegador” ou “Verificar perfil”. A captura
-fornecida indica:
-
-- `@gabrielmartins826392`: perfil completo, 7 posts — não alterar.
-- `@dailysar_inha3836`: faltam biografia e 7 posts.
-- `@lorenaalves9394`: faltam biografia e 7 posts.
-
-Os demais perfis não ficaram totalmente visíveis e não são inferidos.
+autorizar botões como “Abrir navegador” ou “Verificar perfil”. A captura real
+de 139 controles expôs os nove cartões. Sete contas apresentam aviso explícito
+de perfil pendente: `@dailysar_inha3836`, `@lorenaalves9394`,
+`@lourd_es8634`, `@lucafer_reira`, `@luizalmeida6545`, `@silvamario3962` e
+`@yasmendes88`. `@gabrielmartins826392` e `@levygoncalcks` já constam como
+completas no estado local e são apenas preservadas; a árvore UIA atual não
+expõe nelas o selo visual “Perfil completo”.
 
 Depois que `inspect-bot` identificar as contas, sincronize os estados com o
 painel local sem clicar no aplicativo:

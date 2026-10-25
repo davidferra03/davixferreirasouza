@@ -1,11 +1,11 @@
 # Relatório de validação
 
-Data: 24/10/2026
+Data: 25/10/2026
 
 ## Validado neste ambiente
 
 - Compilação de todos os módulos Python: aprovada.
-- Testes automatizados: 2 aprovados.
+- Testes automatizados: 16 aprovados.
 - Inicialização repetível e cadastro dinâmico de perfis, diretórios, SQLite e relatório: aprovada.
 - Cadastro em lote validado com 12 perfis via CLI; teste automatizado validado com
   25 perfis e criação correta de `Perfil_25`.
@@ -20,21 +20,25 @@ Data: 24/10/2026
 - Acesso Git do repositório original via proxy da plataforma: aprovado antes da
   mudança de escopo da solicitação.
 
-## Observado nas capturas fornecidas
+## Validado na área de trabalho Windows do usuário
 
-- `@gabrielmartins826392`: perfil completo e 7 publicações; deve ser preservado.
-- `@dailysar_inha3836`: aplicativo indica falta de biografia e 0/7 publicações.
-- `@lorenaalves9394`: aplicativo indica falta de biografia e 0/7 publicações.
-- O VEM ENGAJAR BOT mostra 9 contas, mas as demais não estão totalmente visíveis.
+- Google Flow: uma imagem foi gerada e recuperada em JPEG. O original íntegro
+  mede 1792×2400; a versão ajustada sem deformação mede 1800×2400, proporção
+  exata 3:4. Nenhuma imagem foi publicada.
+- VEM ENGAJAR BOT: `inspect-bot` encontrou a janela no PowerShell do usuário
+  `ferre`, registrou 139 controles e identificou os nove cartões de conta.
+- A captura real foi reproduzida nos testes do parser: contador 9/9, sete contas
+  com aviso explícito de perfil pendente e duas sem o selo completo exposto pela
+  UIA. As duas últimas só podem ser preservadas se já estiverem confirmadas como
+  completas no banco local; nunca são promovidas pela ausência do selo.
+- O `dry-run` foi validado automaticamente para não alterar bytes nem horários
+  do banco, relatório ou arquivos dos perfis.
 
-Essas observações não foram gravadas nos slots porque não existe uma associação
-confirmada entre usernames e os slots locais.
+Ainda falta executar a versão corrigida do `sync-bot --dry-run` uma vez no
+Windows e conferir o resumo antes da sincronização local efetiva.
 
 ## Não testado (bloqueio de ambiente)
 
-- Google Flow e download real: a máquina atual é Linux em nuvem, sem a sessão
-  Chrome do usuário e sem prompts fornecidos.
-- VEM ENGAJAR BOT: aplicativo Windows não está instalado/acessível nesta máquina.
 - Instagram real: nenhuma credencial foi solicitada ou exposta; a máquina não
   dispõe da sessão do usuário nem de configuração da API oficial.
 - Publicação: nenhuma postagem foi realizada.
@@ -42,15 +46,17 @@ confirmada entre usernames e os slots locais.
 
 ## Próxima validação segura no Windows
 
-1. Copiar esta pasta para o Windows e executar `iniciar.ps1`.
-2. Associar cada username ao slot correto com `set-profile`, marcando contas
-   completas antes de liberar a fila.
-3. Calibrar os seletores atuais do Google Flow via Playwright Codegen.
-4. Preencher `prompts.txt` do perfil de teste e gerar apenas uma imagem.
-5. Confirmar arquivo 3:4 e hash no relatório.
-6. Inspecionar a árvore UIA do VEM ENGAJAR BOT em modo somente leitura.
-7. Para publicar, usar uma conta profissional de teste e a Graph API; confirmar
-   que a verificação de username bloqueia qualquer divergência.
+1. Atualizar os arquivos do Windows para o commit informado no GitHub.
+2. Executar `inspect-bot` e `sync-bot --dry-run` no PowerShell do usuário
+   `ferre`; confirmar 9/9, sete `unchanged` e duas
+   `skipped_complete_unconfirmed`.
+3. Executar `sync-bot` para aplicar somente a associação local, sem clicar no
+   VEM ENGAJAR.
+4. Definir identidade, biografia, avatar, prompts e legendas do primeiro perfil
+   de teste; gerar apenas os arquivos necessários para chegar a sete posts.
+5. Configurar uma conta profissional de teste e a Instagram Graph API, com
+   mídia pública HTTPS; confirmar a verificação de username antes de publicar.
+6. Validar o fluxo completo em uma conta e somente depois ampliar a fila.
 
 CAPTCHA, checkpoint, autenticação pendente ou bloqueio de segurança exigem
 intervenção manual e não devem ser contornados.
