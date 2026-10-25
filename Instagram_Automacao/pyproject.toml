@@ -15,5 +15,8 @@ dev = ["pytest>=8,<9"]
 [project.scripts]
 instagram-automacao = "instagram_automacao.cli:main"
 
+[tool.setuptools.packages.find]
+include = ["instagram_automacao*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

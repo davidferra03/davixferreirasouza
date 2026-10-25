@@ -11,7 +11,7 @@ from .images import fit_three_by_four
 from .queue import set_paused
 from .queue import add_task
 from .storage import add_profile, connect, initialize, register_asset, sync_bot_accounts, update_profile, write_report
-from .vem_engajar import inspect_window
+from .vem_engajar import inspect_window, validate_diagnostic
 from .worker import execute, run
 
 
@@ -30,7 +30,8 @@ def parser() -> argparse.ArgumentParser:
     image.add_argument("--mode", choices=("pad", "crop"), default="pad")
     inspect = sub.add_parser("inspect-bot")
     inspect.add_argument("--output", type=Path)
-    sub.add_parser("sync-bot")
+    sync = sub.add_parser("sync-bot")
+    sync.add_argument("--dry-run", action="store_true")
     flow_test = sub.add_parser("flow-test")
     flow_test.add_argument("profile_id", type=int)
     flow_test.add_argument("--prompt", required=True)
@@ -90,16 +91,27 @@ def main() -> None:
         print(f"Diagnóstico somente leitura salvo em: {output}")
         print(f"Controles encontrados: {result['control_count']}")
         print(f"Contas identificadas: {len(result['accounts'])}")
+        validation = result.get("validation") or validate_diagnostic(result)
+        print(f"Captura válida para sincronização: {'sim' if validation['valid'] else 'não'}")
+        if validation["errors"]:
+            print("Motivos: " + "; ".join(validation["errors"]))
     elif args.command == "sync-bot":
         initialize(settings.root, settings.initial_profiles)
         result = inspect_window()
-        if not result["accounts"]:
-            raise RuntimeError(
-                "Nenhuma conta ficou acessível. Abra o VEM ENGAJAR na página Contas, aguarde o carregamento e tente novamente."
-            )
-        synced = sync_bot_accounts(settings.root, result["accounts"], settings.target_posts)
+        output = settings.root / "logs" / "vem_engajar_uia.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        validation = result.get("validation") or validate_diagnostic(result)
+        if not validation["valid"]:
+            raise RuntimeError("Captura insegura para sincronização: " + "; ".join(validation["errors"]))
+        synced = sync_bot_accounts(
+            settings.root, result["accounts"], settings.target_posts, dry_run=args.dry_run,
+        )
         print(json.dumps(synced, ensure_ascii=False, indent=2))
-        print("Sincronização local concluída; nenhum botão do VEM ENGAJAR foi acionado.")
+        if args.dry_run:
+            print("Simulação concluída; banco e VEM ENGAJAR não foram alterados.")
+        else:
+            print("Sincronização local concluída; nenhum botão do VEM ENGAJAR foi acionado.")
     elif args.command == "flow-test":
         initialize(settings.root, settings.initial_profiles)
         result = execute(settings, {

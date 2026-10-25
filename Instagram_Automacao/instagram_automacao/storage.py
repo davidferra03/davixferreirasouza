@@ -153,39 +153,103 @@ def update_profile(
     write_report(root)
 
 
-def sync_bot_accounts(root: Path, accounts: list[dict], target_posts: int) -> list[dict]:
-    """Merge VEM ENGAJAR observations into local state without changing the app."""
+def sync_bot_accounts(
+    root: Path, accounts: list[dict], target_posts: int, *, dry_run: bool = False,
+) -> list[dict]:
+    """Merge explicit VEM observations atomically and conservatively.
+
+    ``None`` means the UI supplied no evidence and therefore preserves the
+    existing value. Profiles already marked complete are never changed.
+    """
+    if not accounts:
+        raise ValueError("Nenhuma conta foi fornecida para sincronização")
+    usernames = [str(account.get("username", "")).strip().lstrip("@") for account in accounts]
+    if any(not username for username in usernames):
+        raise ValueError("Existe conta sem username")
+    normalized = [username.casefold() for username in usernames]
+    if len(normalized) != len(set(normalized)):
+        raise ValueError("Existem usernames duplicados na captura")
+    if any(account.get("status") not in {"complete", "pending"} for account in accounts):
+        raise ValueError("A captura contém conta sem estado explícito")
+
     synced = []
-    for observed in accounts:
-        username = observed["username"].strip().lstrip("@")
-        with connect(root) as con:
+    folders = []
+    timestamp = now()
+    with connect(root) as con:
+        con.execute("BEGIN IMMEDIATE")
+        next_id = int(con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM profiles").fetchone()[0])
+        for observed, username in zip(accounts, usernames):
             row = con.execute(
                 "SELECT * FROM profiles WHERE lower(instagram_username)=lower(?)", (username,)
             ).fetchone()
-        if row is None:
-            created = add_profile(root, username)
-            profile_id = created["id"]
-            action = "created"
-        else:
-            profile_id = int(row["id"])
-            action = "updated"
-        complete = bool(observed.get("complete"))
-        with connect(root) as con:
-            con.execute(
-                """UPDATE profiles SET avatar_complete=?, biography_complete=?,
-                   posts_existing=CASE WHEN ? THEN MAX(posts_existing, ?) ELSE posts_existing END,
-                   status=?, last_error=NULL, updated_at=? WHERE id=?""",
-                (int(observed.get("avatar_complete", False)), int(complete), int(complete),
-                 target_posts, "complete" if complete else "pending", now(), profile_id),
+            if row is not None and row["status"] == "complete":
+                synced.append({
+                    "id": int(row["id"]), "username": username,
+                    "action": "skipped_complete", "status": "complete",
+                })
+                continue
+
+            if row is None:
+                profile_id = next_id
+                next_id += 1
+                slot = f"Perfil_{profile_id:02d}"
+                current = {
+                    "avatar_complete": 0, "biography_complete": 0,
+                    "posts_existing": 0, "status": "pending",
+                }
+                action = "would_create" if dry_run else "created"
+                if not dry_run:
+                    con.execute(
+                        "INSERT INTO profiles(id, slot, instagram_username, updated_at) VALUES (?, ?, ?, ?)",
+                        (profile_id, slot, username, timestamp),
+                    )
+                    folders.append(slot)
+            else:
+                profile_id = int(row["id"])
+                current = dict(row)
+                action = "would_update" if dry_run else "updated"
+
+            complete = observed["status"] == "complete"
+            avatar = observed.get("avatar_complete")
+            biography = observed.get("biography_complete")
+            posts = observed.get("posts_existing")
+            avatar_value = current["avatar_complete"] if avatar is None else int(bool(avatar))
+            biography_value = current["biography_complete"] if biography is None else int(bool(biography))
+            if complete:
+                avatar_value = 1 if avatar is None else avatar_value
+                biography_value = 1 if biography is None else biography_value
+                posts_value = max(int(current["posts_existing"]), target_posts)
+            else:
+                posts_value = int(current["posts_existing"]) if posts is None else int(posts)
+            status = "complete" if complete else "pending"
+
+            changed = (
+                row is None
+                or int(current["avatar_complete"]) != avatar_value
+                or int(current["biography_complete"]) != biography_value
+                or int(current["posts_existing"]) != posts_value
+                or current["status"] != status
             )
-        synced.append({
-            "id": profile_id,
-            "username": username,
-            "action": action,
-            "status": "complete" if complete else "pending",
-            "avatar_complete": bool(observed.get("avatar_complete")),
-        })
-    write_report(root)
+            if row is not None and not changed:
+                action = "unchanged"
+            elif not dry_run:
+                con.execute(
+                    """UPDATE profiles SET avatar_complete=?, biography_complete=?,
+                       posts_existing=?, status=?, last_error=NULL, updated_at=? WHERE id=?""",
+                    (avatar_value, biography_value, posts_value, status, timestamp, profile_id),
+                )
+            synced.append({
+                "id": profile_id, "username": username, "action": action,
+                "status": status, "avatar_complete": bool(avatar_value),
+                "biography_complete": bool(biography_value), "posts_existing": posts_value,
+            })
+        if dry_run:
+            con.rollback()
+
+    if not dry_run:
+        for slot in folders:
+            _create_profile_folders(root, slot)
+        write_report(root)
     return synced
 
 

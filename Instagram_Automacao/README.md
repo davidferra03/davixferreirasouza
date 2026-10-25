@@ -95,8 +95,16 @@ Depois que `inspect-bot` identificar as contas, sincronize os estados com o
 painel local sem clicar no aplicativo:
 
 ```powershell
+instagram-automacao sync-bot --dry-run
 instagram-automacao sync-bot
 ```
+
+Use sempre `--dry-run` primeiro. A sincronização só é aceita quando o contador
+total da interface coincide com a quantidade de cartões lidos, todos os
+usernames são únicos e cada conta possui evidência explícita de “Perfil
+completo” ou de requisito pendente. Estados ambíguos interrompem a operação;
+campos sem evidência permanecem inalterados e perfis locais já completos são
+preservados.
 
 ## Comandos úteis
 

@@ -5,8 +5,8 @@ from PIL import Image
 from instagram_automacao.flow import _unique_destination
 from instagram_automacao.images import fit_three_by_four
 from instagram_automacao.queue import add_task, claim_next, finish, is_paused, set_paused
-from instagram_automacao.storage import add_profile, connect, initialize, sync_bot_accounts
-from instagram_automacao.vem_engajar import parse_accounts, redact
+from instagram_automacao.storage import add_profile, connect, initialize, sync_bot_accounts, update_profile
+from instagram_automacao.vem_engajar import parse_accounts, redact, validate_diagnostic
 
 
 def test_initialize_and_queue_are_idempotent(tmp_path: Path):
@@ -52,25 +52,91 @@ def test_flow_download_never_overwrites(tmp_path: Path):
 def test_parse_and_sync_bot_accounts(tmp_path: Path):
     diagnostic = {
         "controls": [
+            {"name": "2 contas", "control_type": "Text", "rectangle": {"left": 1, "top": 1, "right": 100, "bottom": 20}},
             {"name": "Conta @pendente", "control_type": "ListItem", "rectangle": {"left": 10, "top": 100, "right": 500, "bottom": 200}},
+            {"name": "Falta: Biografia", "control_type": "Text", "rectangle": {"left": 20, "top": 120, "right": 180, "bottom": 135}},
+            {"name": "Falta: Publicações no feed (tem 0, mínimo 7)", "control_type": "Text", "rectangle": {"left": 190, "top": 120, "right": 450, "bottom": 135}},
             {"name": "Bloqueada nas tarefas do bot até completar o perfil", "control_type": "Text", "rectangle": {"left": 20, "top": 130, "right": 400, "bottom": 150}},
             {"name": "Abrir navegador da conta @pendente", "control_type": "Button", "rectangle": {"left": 20, "top": 160, "right": 120, "bottom": 180}},
             {"name": "Conta @completo", "control_type": "ListItem", "rectangle": {"left": 10, "top": 200, "right": 500, "bottom": 300}},
             {"name": "Foto de perfil de @completo", "control_type": "Image", "rectangle": {"left": 20, "top": 220, "right": 60, "bottom": 260}},
+            {"name": "Perfil completo", "control_type": "Text", "rectangle": {"left": 70, "top": 220, "right": 180, "bottom": 240}},
             {"name": "Verificar o perfil da conta @completo", "control_type": "Button", "rectangle": {"left": 20, "top": 270, "right": 120, "bottom": 290}},
         ]
     }
     accounts = parse_accounts(diagnostic)
-    assert accounts == [
-        {"username": "pendente", "complete": False, "blocked": True, "avatar_complete": False, "can_verify": False, "can_open_browser": True, "can_close_browser": False},
-        {"username": "completo", "complete": True, "blocked": False, "avatar_complete": True, "can_verify": True, "can_open_browser": False, "can_close_browser": False},
-    ]
+    diagnostic["accounts"] = accounts
+    assert validate_diagnostic(diagnostic)["valid"]
+    assert accounts[0]["status"] == "pending"
+    assert accounts[0]["complete"] is False
+    assert accounts[0]["avatar_complete"] is None
+    assert accounts[0]["biography_complete"] is False
+    assert accounts[0]["posts_existing"] == 0
+    assert accounts[1]["status"] == "complete"
+    assert accounts[1]["complete"] is True
+    assert accounts[1]["avatar_complete"] is True
+    assert accounts[1]["biography_complete"] is True
     initialize(tmp_path)
     synced = sync_bot_accounts(tmp_path, accounts, 7)
     assert len(synced) == 2
     with connect(tmp_path) as con:
         rows = con.execute("SELECT instagram_username, status, posts_existing FROM profiles ORDER BY id").fetchall()
     assert [tuple(row) for row in rows] == [("pendente", "pending", 0), ("completo", "complete", 7)]
+
+
+def test_bot_capture_requires_counter_unique_accounts_and_explicit_status():
+    controls = [
+        {"name": "3 contas", "control_type": "Text", "rectangle": {}},
+        {"name": "Conta @sem_estado", "control_type": "ListItem", "rectangle": {"left": 0, "top": 10, "right": 100, "bottom": 20}},
+        {"name": "Conta @sem_estado", "control_type": "ListItem", "rectangle": {"left": 0, "top": 20, "right": 100, "bottom": 30}},
+    ]
+    diagnostic = {"controls": controls}
+    diagnostic["accounts"] = parse_accounts(diagnostic)
+    validation = validate_diagnostic(diagnostic)
+    assert not validation["valid"]
+    assert any("contador indica 3" in error for error in validation["errors"])
+    assert any("duplicados" in error for error in validation["errors"])
+    assert any("sem evidência" in error for error in validation["errors"])
+
+
+def test_bot_sync_dry_run_is_read_only_and_complete_profiles_are_preserved(tmp_path: Path):
+    initialize(tmp_path)
+    complete = add_profile(tmp_path, "ja_completo")
+    update_profile(
+        tmp_path, complete["id"], username="ja_completo", display_name="Preservar",
+        biography="Pronta", avatar_complete=True, biography_complete=True,
+        posts_existing=12, complete=True,
+    )
+    accounts = [
+        {
+            "username": "ja_completo", "status": "pending", "complete": False,
+            "avatar_complete": False, "biography_complete": False, "posts_existing": 0,
+        },
+        {
+            "username": "novo", "status": "pending", "complete": False,
+            "avatar_complete": None, "biography_complete": False, "posts_existing": 2,
+        },
+    ]
+    preview = sync_bot_accounts(tmp_path, accounts, 7, dry_run=True)
+    assert preview[0]["action"] == "skipped_complete"
+    assert preview[1]["action"] == "would_create"
+    with connect(tmp_path) as con:
+        rows = con.execute(
+            "SELECT instagram_username, status, posts_existing FROM profiles ORDER BY id"
+        ).fetchall()
+    assert [tuple(row) for row in rows] == [("ja_completo", "complete", 12)]
+
+
+def test_bot_sync_rejects_unknown_state_without_writing(tmp_path: Path):
+    initialize(tmp_path)
+    try:
+        sync_bot_accounts(tmp_path, [{"username": "duvidoso", "status": "unknown"}], 7)
+    except ValueError as error:
+        assert "sem estado explícito" in str(error)
+    else:
+        raise AssertionError("estado desconhecido deveria impedir sincronização")
+    with connect(tmp_path) as con:
+        assert con.execute("SELECT count(*) FROM profiles").fetchone()[0] == 0
 
 
 def test_fit_three_by_four_without_stretching(tmp_path: Path):
